@@ -13,7 +13,7 @@ class FanduelOdds {
 
     // Constructor 
     public function __construct($secret_key, $liveMarketsEndpoint="https://affiliates.sportsbook.fanduel.com/betting/rest/v1/listMarketCatalogue/", 
-    $liveMarketPricesEndpoint="https://affiliates.sportsbook.fanduel.com/betting/rest/v1/listMarketPrices/") {
+        $liveMarketPricesEndpoint="https://affiliates.sportsbook.fanduel.com/betting/rest/v1/listMarketPrices/") {
         $this->liveMarketsEndpoint = $liveMarketsEndpoint;
         $this->liveMarketPricesEndpoint = $liveMarketPricesEndpoint;
         $this->secret_key = $secret_key;
