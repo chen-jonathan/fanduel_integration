@@ -2,8 +2,8 @@
 
 require_once 'fanduelOdds.php';
 
-$fanduel = new FanduelOdds("Y92oEkhNW2osW6tS");
+$fanduel = new FanduelOdds(/* Secret Key */);
 
-print_r($fanduel->getLiveMarketIds());
+print_r($fanduel->getHtml());
 
 

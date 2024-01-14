@@ -26,24 +26,34 @@ class FanduelOdds {
          * @param
          * @return HTML the corresponding prices table 
          */
-        
-        $html = '
-            <div>
-                <h1>Welcome to My Website</h1>
-                <p>This is an example of returning HTML from a PHP function.</p>
-            </div>
-        ';
 
-        return $html;
+        
+        $liveMarketIds = $this->getLiveMarketIds();
+        print_r($liveMarketIds);
+
+        if (count($liveMarketIds) == 0) {
+            // there was some error fetching liveMarketIds
+            return '';
+        }
+        else {
+            //TODO: call getMarketPrices() and create table with relevant prices here 
+            $html = '
+                <div>
+                    <h1>Test</h1>
+                </div>
+            ';
+            return $html;
+        }       
     }
 
-    public function getLiveMarketIds() {
+    private function getLiveMarketIds() {
         /**
          * Helper function that returns ids of all live NBA markets. Calls the $liveMarketsEndpoint
          *
          * @return array Array of live market ids
          */
 
+        // setup request to ListMarketCatalogue API
         $liveMarketsRequestPayload = json_encode([
             "listMarketCatalogueRequestParams" => [
                 "marketFilter" => [
@@ -72,21 +82,18 @@ class FanduelOdds {
 
         $liveMarketsResponse = curl_exec($liveMarketsCh);
 
+        // process the response
         if (curl_errno($liveMarketsCh)) {
-            echo 'Error: ' . curl_error($liveMarketsCh);
+            echo 'Error (getLiveMarketIds): ' . curl_error($liveMarketsCh);
             curl_close($liveMarketsCh);
             return [];
         } 
         else {
             $data = json_decode($liveMarketsResponse);
             $liveMarketIds = [];
+            // grab all liveMarketIds
             foreach ($data as $item) {
                 array_push($liveMarketIds, $item->marketId);
-
-                // echo "Market ID: " . $item->marketId . PHP_EOL;
-                // echo "Market Name: " . $item->marketName . "\n";
-                // echo "Market Start Time: " . $item->marketStartTime . "\n";
-                // echo "--------------------------\n";
             }
             curl_close($liveMarketsCh);
             return $liveMarketIds;
