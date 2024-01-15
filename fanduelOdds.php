@@ -42,11 +42,46 @@ class FanduelOdds {
 
             print_r($processedMarketPrices);
             //create table out of processedMarketPrices
-            $html = '
-                <div>
-                    <h1>Test</h1>
-                </div>
-            ';
+            $html = sprintf('
+            <div>
+                <style>
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                    }
+                    table, th, td {
+                        border: 1px solid black;
+                    }
+                    th, td {
+                        padding: 5px;
+                        text-align: center;
+                    }
+                    th {
+                        background-color: #f2f2f2;
+                    }
+                </style>
+                <table>
+                    <tr>
+                        <th></th>
+                        <th>Spread</th>
+                        <th>Moneyline</th>
+                        <th>Over/Under</th>
+                    </tr>
+                    <tr>
+                        <td>Raptors</td>
+                        <td>%s (%s)</td>
+                        <td>+370</td>
+                        <td>O 235.5 (-112)</td>
+                    </tr>
+                    <tr>
+                        <td>Clippers</td>
+                        <td>-10.5 (-108)</td>
+                        <td>-480</td>
+                        <td>U 235.5 (-108)</td>
+                    </tr>
+                </table>
+            </div>
+            ', );
             return $html;
         }       
     }
@@ -136,7 +171,7 @@ class FanduelOdds {
         $marketPricesResponse = curl_exec($marketPricesCh);
     
         if (curl_errno($marketPricesCh)) {
-            echo 'Error: ' . curr_error($marketPricesCh);
+            echo 'Error (getMarketPrices): ' . curr_error($marketPricesCh);
             curl_close($marketPricesCh);
             return [];
         } 
@@ -186,20 +221,20 @@ class FanduelOdds {
                 // print_r($market->runnerDetails);
                 foreach($market->runnerDetails as $runnerDetail) {
                     if ($runnerDetail->selectionId == self::RAPTORS_ID) {
-                        $raptorsPrices->moneyLine = $runnerDetail;
+                        $raptorsPrices->moneyLine = [$this->convertToAmericanOdds($runnerDetail), $runnerDetail->handicap];
                     }
                     else {
-                        $opponentPrices->moneyLine = $runnerDetail;
+                        $opponentPrices->moneyLine = [$this->convertToAmericanOdds($runnerDetail), $runnerDetail->handicap];
                     }
                 }
             }
             elseif ($market->marketName == "Spread Betting") {
                 foreach($market->runnerDetails as $runnerDetail) {
                     if ($runnerDetail->selectionId == self::RAPTORS_ID) {
-                        $raptorsPrices->spread = $runnerDetail;
+                        $raptorsPrices->spread = [$this->convertToAmericanOdds($runnerDetail), $runnerDetail->handicap];
                     }
                     else {
-                        $opponentPrices->spread = $runnerDetail;
+                        $opponentPrices->spread = [$this->convertToAmericanOdds($runnerDetail), $runnerDetail->handicap];
                     }
                 }
             }
@@ -207,15 +242,26 @@ class FanduelOdds {
             elseif ($market->marketName == "Total Points") {
                 foreach($market->runnerDetails as $runnerDetail) {
                     if ($runnerDetail->selectionId == self::OVER_ID) {
-                        $overUnderPrices->over = $runnerDetail;
+                        $overUnderPrices->over = [$this->convertToAmericanOdds($runnerDetail), $runnerDetail->handicap];
                     }
                     else {
-                        $overUnderPrices->under = $runnerDetail;
+                        $overUnderPrices->under = [$this->convertToAmericanOdds($runnerDetail), $runnerDetail->handicap];
                     }
                 }
             }            
         }
         return [$raptorsPrices, $opponentPrices, $overUnderPrices];
+    }
+
+    private function convertToAmericanOdds($runnerDetail) {
+        $decimalValue = floatval($runnerDetail->winRunnerOdds->decimal);
+
+        if ($decimalValue > 2) {
+            return ($decimalValue - 1) * 100;
+        }
+        else {
+            return -100 / ($decimalValue - 1);
+        }
 
     }
 }
