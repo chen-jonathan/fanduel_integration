@@ -7,7 +7,7 @@ class FanduelOdds {
 
     const BASKETBALL_ID = "7522";
     const NBA_ID = "10547864";
-    const RAPTORS_ID = ""; //TODO: fill out with value from Confluence doc 
+    const RAPTORS_ID = "237476";
   
     const MARKET_TYPES = ["MATCH_HANDICAP_(2-WAY)","MONEY_LINE","TOTAL_POINTS_(OVER/UNDER)"];
 
@@ -29,7 +29,6 @@ class FanduelOdds {
 
         
         $liveMarketIds = $this->getLiveMarketIds();
-        print_r($liveMarketIds);
 
         if (count($liveMarketIds) == 0) {
             // there was some error fetching liveMarketIds
@@ -37,6 +36,8 @@ class FanduelOdds {
         }
         else {
             //TODO: call getMarketPrices() and create table with relevant prices here 
+            $marketPrices = $this->getMarketPrices($liveMarketIds);
+            print_r($marketPrices);
             $html = '
                 <div>
                     <h1>Test</h1>
@@ -90,21 +91,77 @@ class FanduelOdds {
         } 
         else {
             $data = json_decode($liveMarketsResponse);
+            curl_close($liveMarketsCh);
+
             $liveMarketIds = [];
             // grab all liveMarketIds
             foreach ($data as $item) {
                 array_push($liveMarketIds, $item->marketId);
             }
-            curl_close($liveMarketsCh);
             return $liveMarketIds;
         }
     }
-    private function getMarketPrices() {
+    private function getMarketPrices($liveMarketIds) {
         /**
          * Helper function that returns market prices for Spread Betting, Money Line and Total Points for next Raptors game
          *
          * @return array Array of market prices for next Raptors game
          */
-        return [];
+        
+        $marketPricesRequestPayload = json_encode([
+            "listMarketPricesRequestParams" => [
+                "marketIds" => $liveMarketIds,
+            ]
+        ]);
+
+        $requestHeaders = [
+            "Content-type: application/json",
+            "X-Application: " . $this->secret_key
+        ];
+    
+        $marketPricesCh = curl_init();
+    
+        curl_setopt_array($marketPricesCh, [
+            CURLOPT_URL => "https://affiliates.sportsbook.fanduel.com/betting/rest/v1/listMarketPrices/",
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST => "POST",
+            CURLOPT_POSTFIELDS => $marketPricesRequestPayload,
+            CURLOPT_HTTPHEADER => $requestHeaders
+        ]);
+    
+        $marketPricesResponse = curl_exec($marketPricesCh);
+    
+        if (curl_errno($marketPricesCh)) {
+            echo 'Error: ' . curr_error($marketPricesCh);
+            curl_close($marketPricesCh);
+            return [];
+        } 
+        else {
+            $data = json_decode($marketPricesResponse);
+            // print_r($data);
+            curl_close($marketPricesCh);
+            
+            $groupedMarketsByGame = new stdClass();
+            $raptorsEventId = "";
+            //group market prices by game ID
+            foreach($data->marketDetails as $market_detail) {
+                $eventId = $market_detail->eventId;
+    
+                // Initialize the array for this eventId if it hasn't been created yet
+                if (!isset($groupedMarketsByGame->$eventId)) {
+                    $groupedMarketsByGame->$eventId = [];
+                }
+                array_push($groupedMarketsByGame->$eventId, $market_detail);
+    
+                foreach($market_detail->runnerDetails as $runnerDetail) {
+                    if ($runnerDetail->selectionId == self::RAPTORS_ID) {
+                        $raptorsEventId = $eventId;
+                    }
+                }
+            }
+    
+            //find Raptors team id, find corresponding game, if Raptors game does not exists return empty html? 
+            return $groupedMarketsByGame->$raptorsEventId;
+        }
     }
 }
