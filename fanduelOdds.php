@@ -10,6 +10,7 @@ class FanduelOdds {
     const RAPTORS_ID = "237476";
   
     const MARKET_TYPES = ["MATCH_HANDICAP_(2-WAY)","MONEY_LINE","TOTAL_POINTS_(OVER/UNDER)"];
+    const OVER_ID = "7017823";
 
     // Constructor 
     public function __construct($secret_key, $liveMarketsEndpoint="https://affiliates.sportsbook.fanduel.com/betting/rest/v1/listMarketCatalogue/", 
@@ -37,7 +38,10 @@ class FanduelOdds {
         else {
             //TODO: call getMarketPrices() and create table with relevant prices here 
             $marketPrices = $this->getMarketPrices($liveMarketIds);
-            print_r($marketPrices);
+            $processedMarketPrices = $this->processMarketPrices($marketPrices);
+
+            print_r($processedMarketPrices);
+            //create table out of processedMarketPrices
             $html = '
                 <div>
                     <h1>Test</h1>
@@ -163,5 +167,55 @@ class FanduelOdds {
             //find Raptors team id, find corresponding game, if Raptors game does not exists return empty html? 
             return $groupedMarketsByGame->$raptorsEventId;
         }
+    }
+
+    private function processMarketPrices($marketPrices) {
+        /**
+         * Helper function that groups market prices by Raptors, opponent, and Over/Under
+         *
+         * @return array Array of market prices with groupings listed above. [Raptors, Opponent, Over/Under]
+         */
+
+        $raptorsPrices = new stdClass();
+        $opponentPrices = new stdClass();
+        $overUnderPrices = new stdClass();
+
+        foreach ($marketPrices as $market) {            
+
+            if ($market->marketName == "Moneyline") {
+                // print_r($market->runnerDetails);
+                foreach($market->runnerDetails as $runnerDetail) {
+                    if ($runnerDetail->selectionId == self::RAPTORS_ID) {
+                        $raptorsPrices->moneyLine = $runnerDetail;
+                    }
+                    else {
+                        $opponentPrices->moneyLine = $runnerDetail;
+                    }
+                }
+            }
+            elseif ($market->marketName == "Spread Betting") {
+                foreach($market->runnerDetails as $runnerDetail) {
+                    if ($runnerDetail->selectionId == self::RAPTORS_ID) {
+                        $raptorsPrices->spread = $runnerDetail;
+                    }
+                    else {
+                        $opponentPrices->spread = $runnerDetail;
+                    }
+                }
+            }
+
+            elseif ($market->marketName == "Total Points") {
+                foreach($market->runnerDetails as $runnerDetail) {
+                    if ($runnerDetail->selectionId == self::OVER_ID) {
+                        $overUnderPrices->over = $runnerDetail;
+                    }
+                    else {
+                        $overUnderPrices->under = $runnerDetail;
+                    }
+                }
+            }            
+        }
+        return [$raptorsPrices, $opponentPrices, $overUnderPrices];
+
     }
 }
