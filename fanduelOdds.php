@@ -7,16 +7,15 @@ class FanduelOdds {
 
     const BASKETBALL_ID = "7522";
     const NBA_ID = "10547864";
-    const RAPTORS_ID = "237476";
+    const RAPTORS_ID = "237476"; 
   
     const MARKET_TYPES = ["MATCH_HANDICAP_(2-WAY)","MONEY_LINE","TOTAL_POINTS_(OVER/UNDER)"];
     const OVER_ID = "7017823";
+    const LIVE_MARKETS_ENDPOINT = "https://affiliates.sportsbook.fanduel.com/betting/rest/v1/listMarketCatalogue/";
+    const LIVE_MARKET_PRICES_ENDPOINT = "https://affiliates.sportsbook.fanduel.com/betting/rest/v1/listMarketPrices/";
 
     // Constructor 
-    public function __construct($secret_key, $liveMarketsEndpoint="https://affiliates.sportsbook.fanduel.com/betting/rest/v1/listMarketCatalogue/", 
-        $liveMarketPricesEndpoint="https://affiliates.sportsbook.fanduel.com/betting/rest/v1/listMarketPrices/") {
-        $this->liveMarketsEndpoint = $liveMarketsEndpoint;
-        $this->liveMarketPricesEndpoint = $liveMarketPricesEndpoint;
+    public function __construct($secret_key) {
         $this->secret_key = $secret_key;
     }
 
@@ -88,6 +87,36 @@ class FanduelOdds {
         }       
     }
 
+    private function executeAPICall($payload, $endpoint) {
+        $requestHeaders = [
+            "Content-type: application/json",
+            "X-Application: " . $this->secret_key
+        ];
+
+        $liveMarketsCh = curl_init();
+
+        curl_setopt_array($liveMarketsCh, [
+            CURLOPT_URL => $endpoint,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST => "POST",
+            CURLOPT_POSTFIELDS => $payload,
+            CURLOPT_HTTPHEADER => $requestHeaders
+        ]);
+
+        $liveMarketsResponse = curl_exec($liveMarketsCh);
+
+        // process the response
+        if (curl_errno($liveMarketsCh)) {
+            echo 'Error (getLiveMarketIds): ' . curl_error($liveMarketsCh);
+            curl_close($liveMarketsCh);
+            return [];
+        } 
+        else {
+            $data = json_decode($liveMarketsResponse);
+            return $data;
+        }
+    }
+
     private function getLiveMarketIds() {
         /**
          * Helper function that returns ids of all live NBA markets. Calls the $liveMarketsEndpoint
@@ -105,42 +134,21 @@ class FanduelOdds {
                 ],
                 "maxResults" => 1000
             ]
-        ]);
-        
-        $requestHeaders = [
-            "Content-type: application/json",
-            "X-Application: " . $this->secret_key
-        ];
+        ]); 
+       
+        $data = $this->executeAPICall($liveMarketsRequestPayload, self::LIVE_MARKETS_ENDPOINT);
 
-        $liveMarketsCh = curl_init();
-
-        curl_setopt_array($liveMarketsCh, [
-            CURLOPT_URL => $this->liveMarketsEndpoint,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CUSTOMREQUEST => "POST",
-            CURLOPT_POSTFIELDS => $liveMarketsRequestPayload,
-            CURLOPT_HTTPHEADER => $requestHeaders
-        ]);
-
-        $liveMarketsResponse = curl_exec($liveMarketsCh);
-
-        // process the response
-        if (curl_errno($liveMarketsCh)) {
-            echo 'Error (getLiveMarketIds): ' . curl_error($liveMarketsCh);
-            curl_close($liveMarketsCh);
+        if (count($data) == 0) {
             return [];
-        } 
-        else {
-            $data = json_decode($liveMarketsResponse);
-            curl_close($liveMarketsCh);
-
-            $liveMarketIds = [];
-            // grab all liveMarketIds
-            foreach ($data as $item) {
-                array_push($liveMarketIds, $item->marketId);
-            }
-            return $liveMarketIds;
         }
+
+        $liveMarketIds = [];
+        // grab all liveMarketIds
+        foreach ($data as $item) {
+            array_push($liveMarketIds, $item->marketId);
+        }
+        return $liveMarketIds;
+        
     }
     private function getMarketPrices($liveMarketIds) {
         /**
@@ -156,58 +164,38 @@ class FanduelOdds {
             ]
         ]);
 
-        $requestHeaders = [
-            "Content-type: application/json",
-            "X-Application: " . $this->secret_key
-        ];
-    
-        $marketPricesCh = curl_init();
-    
-        curl_setopt_array($marketPricesCh, [
-            CURLOPT_URL => "https://affiliates.sportsbook.fanduel.com/betting/rest/v1/listMarketPrices/",
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CUSTOMREQUEST => "POST",
-            CURLOPT_POSTFIELDS => $marketPricesRequestPayload,
-            CURLOPT_HTTPHEADER => $requestHeaders
-        ]);
-    
-        $marketPricesResponse = curl_exec($marketPricesCh);
-    
-        if (curl_errno($marketPricesCh)) {
-            echo 'Error (getMarketPrices): ' . curr_error($marketPricesCh);
-            curl_close($marketPricesCh);
+        $data = $this->executeAPICall($marketPricesRequestPayload, self::LIVE_MARKET_PRICES_ENDPOINT);
+
+        // if API call failed, executeAPICall returns an empty array
+        if (is_array($data) && count($data) == 0) {
             return [];
-        } 
-        else {
-            $data = json_decode($marketPricesResponse);
-            curl_close($marketPricesCh);
-            
-            $groupedMarketsByGame = new stdClass();
-            $raptorsEventId = "";
-            //group market prices by eventId (id of the game)
-            foreach($data->marketDetails as $market_detail) {
-                $eventId = $market_detail->eventId;
-    
-                // Initialize the array for this eventId if it hasn't been created yet
-                if (!isset($groupedMarketsByGame->$eventId)) {
-                    $groupedMarketsByGame->$eventId = [];
-                }
-                array_push($groupedMarketsByGame->$eventId, $market_detail);
-    
-                foreach($market_detail->runnerDetails as $runnerDetail) {
-                    if ($runnerDetail->selectionId == self::RAPTORS_ID) {
-                        // grab the eventId of the Raptors game
-                        $raptorsEventId = $eventId;
-                    }
+        }        
+        
+        $groupedMarketsByGame = new stdClass();
+        $raptorsEventId = "";
+        //group market prices by eventId (id of the game)
+        foreach($data->marketDetails as $market_detail) {
+            $eventId = $market_detail->eventId;
+
+            // Initialize the array for this eventId if it hasn't been created yet
+            if (!isset($groupedMarketsByGame->$eventId)) {
+                $groupedMarketsByGame->$eventId = [];
+            }
+            array_push($groupedMarketsByGame->$eventId, $market_detail);
+
+            foreach($market_detail->runnerDetails as $runnerDetail) {
+                if ($runnerDetail->selectionId == self::RAPTORS_ID) {
+                    // grab the eventId of the Raptors game
+                    $raptorsEventId = $eventId;
                 }
             }
-            if (!isset($groupedMarketsByGame->$raptorsEventId)) {
-                return [];
-            }
-            else {
-                return $groupedMarketsByGame->$raptorsEventId;
-            }           
         }
+        if (!isset($groupedMarketsByGame->$raptorsEventId)) {
+            return [];
+        }
+        else {
+            return $groupedMarketsByGame->$raptorsEventId;
+        }           
     }
 
     private function processMarketPrices($marketPrices) {
@@ -223,7 +211,7 @@ class FanduelOdds {
 
         foreach ($marketPrices as $market) {            
 
-            if ($market->marketName == "Moneyline") {
+            if ($market->marketType == "MONEY_LINE") {
                 foreach($market->runnerDetails as $runnerDetail) {
                     if ($runnerDetail->selectionId == self::RAPTORS_ID) {
                         $raptorsPrices->moneyLine = [$this->convertToAmericanOdds($runnerDetail)[0]];
@@ -233,7 +221,7 @@ class FanduelOdds {
                     }
                 }
             }
-            elseif ($market->marketName == "Spread Betting") {
+            elseif ($market->marketType == "MATCH_HANDICAP_(2-WAY)") {
                 foreach($market->runnerDetails as $runnerDetail) {
                     if ($runnerDetail->selectionId == self::RAPTORS_ID) {
                         $raptorsPrices->spread = $this->convertToAmericanOdds($runnerDetail);
@@ -244,7 +232,7 @@ class FanduelOdds {
                 }
             }
 
-            elseif ($market->marketName == "Total Points") {
+            elseif ($market->marketType == "TOTAL_POINTS_(OVER/UNDER)") {
                 foreach($market->runnerDetails as $runnerDetail) {
                     if ($runnerDetail->selectionId == self::OVER_ID) {
                         $overUnderPrices->over = $this->convertToAmericanOdds($runnerDetail, true);
@@ -266,7 +254,7 @@ class FanduelOdds {
          */
 
         foreach ($marketPrices as $market) {      
-            if ($market->marketName != "Total Points") {   
+            if ($market->marketType != "TOTAL_POINTS_(OVER/UNDER)") {   
                 foreach($market->runnerDetails as $runnerDetail) {
                     if ($runnerDetail->selectionId != self::RAPTORS_ID) {
                         return $runnerDetail->selectionName; 
