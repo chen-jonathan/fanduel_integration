@@ -42,7 +42,6 @@ class FanduelOdds {
             }
 
             $processedMarketPrices = $this->processMarketPrices($marketPrices);
-            print_r($processedMarketPrices);
             $opposingTeam = $this->getOpposingTeam($marketPrices);
             
             //create table out of processedMarketPrices
