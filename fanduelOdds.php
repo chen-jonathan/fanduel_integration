@@ -7,7 +7,7 @@ class FanduelOdds {
 
     const BASKETBALL_ID = "7522";
     const NBA_ID = "10547864";
-    const RAPTORS_ID = "237470";//TODO: change back to this value "237476";
+    const RAPTORS_ID = "237476";
   
     const MARKET_TYPES = ["MATCH_HANDICAP_(2-WAY)","MONEY_LINE","TOTAL_POINTS_(OVER/UNDER)"];
     const OVER_ID = "7017823";
@@ -28,7 +28,6 @@ class FanduelOdds {
          * @return HTML the corresponding prices table 
          */
 
-        
         $liveMarketIds = $this->getLiveMarketIds();
 
         if (count($liveMarketIds) == 0) {
@@ -36,12 +35,14 @@ class FanduelOdds {
             return '';
         }
         else {
-            //TODO: call getMarketPrices() and create table with relevant prices here 
             $marketPrices = $this->getMarketPrices($liveMarketIds);
+
+            if (count($marketPrices) == 0) {
+                return '';
+            }
+
             $processedMarketPrices = $this->processMarketPrices($marketPrices);
-
-
-            //Convert each prices into a string, using sprintf to format final html
+            print_r($processedMarketPrices);
             $opposingTeam = $this->getOpposingTeam($marketPrices);
             
             //create table out of processedMarketPrices
@@ -149,6 +150,7 @@ class FanduelOdds {
          * @return array Array of market prices for next Raptors game
          */
         
+        // setup request to ListMarketPrices API
         $marketPricesRequestPayload = json_encode([
             "listMarketPricesRequestParams" => [
                 "marketIds" => $liveMarketIds,
@@ -179,12 +181,11 @@ class FanduelOdds {
         } 
         else {
             $data = json_decode($marketPricesResponse);
-            // print_r($data);
             curl_close($marketPricesCh);
             
             $groupedMarketsByGame = new stdClass();
             $raptorsEventId = "";
-            //group market prices by game ID
+            //group market prices by eventId (id of the game)
             foreach($data->marketDetails as $market_detail) {
                 $eventId = $market_detail->eventId;
     
@@ -196,13 +197,17 @@ class FanduelOdds {
     
                 foreach($market_detail->runnerDetails as $runnerDetail) {
                     if ($runnerDetail->selectionId == self::RAPTORS_ID) {
+                        // grab the eventId of the Raptors game
                         $raptorsEventId = $eventId;
                     }
                 }
             }
-    
-            //find Raptors team id, find corresponding game, if Raptors game does not exists return empty html? 
-            return $groupedMarketsByGame->$raptorsEventId;
+            if (!isset($groupedMarketsByGame->$raptorsEventId)) {
+                return [];
+            }
+            else {
+                return $groupedMarketsByGame->$raptorsEventId;
+            }           
         }
     }
 
@@ -220,7 +225,6 @@ class FanduelOdds {
         foreach ($marketPrices as $market) {            
 
             if ($market->marketName == "Moneyline") {
-                // print_r($market->runnerDetails);
                 foreach($market->runnerDetails as $runnerDetail) {
                     if ($runnerDetail->selectionId == self::RAPTORS_ID) {
                         $raptorsPrices->moneyLine = [$this->convertToAmericanOdds($runnerDetail)[0]];
@@ -256,22 +260,35 @@ class FanduelOdds {
     }
 
     private function getOpposingTeam($marketPrices) {
+        /**
+         * Helper function that grabs the opponent team name
+         *
+         * @return string Opponent team name
+         */
 
-        foreach ($marketPrices as $market) {         
-            foreach($market->runnerDetails as $runnerDetail) {
-                if ($runnerDetail->selectionId != self::RAPTORS_ID) {
-                    return $runnerDetail->selectionName; 
+        foreach ($marketPrices as $market) {      
+            if ($market->marketName != "Total Points") {   
+                foreach($market->runnerDetails as $runnerDetail) {
+                    if ($runnerDetail->selectionId != self::RAPTORS_ID) {
+                        return $runnerDetail->selectionName; 
+                    }
                 }
             }
         }
     }
 
     private function convertToAmericanOdds($runnerDetail, $isTotal=false) {
+        /**
+         * Helper function that converts from decimal odds to American odds. Also adds the corresponding +/- sign. 
+         *
+         * @return array Array of odds as strings, including the converted American odds and handicap
+         */
+
 
         $handicap = "";
 
         if (floatval($runnerDetail->handicap > 0)) {
-            // if market is total, do not add the + sign
+            // if market is Total Points, do not add the + sign
             if (!$isTotal) {
                 $handicap = "+" . $runnerDetail->handicap;
             }
@@ -289,9 +306,7 @@ class FanduelOdds {
             return ["+" . number_format(($decimalValue - 1) * 100), $handicap];
         }
         else {
-            echo gettype(-100/($decimalValue - 1));
             return ["" . number_format(-100 / ($decimalValue - 1)), $handicap];
         }
-
     }
 }
