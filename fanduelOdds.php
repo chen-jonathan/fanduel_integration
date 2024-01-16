@@ -7,7 +7,7 @@ class FanduelOdds {
 
     const BASKETBALL_ID = "7522";
     const NBA_ID = "10547864";
-    const RAPTORS_ID = "237476";
+    const RAPTORS_ID = "237470";//TODO: change back to this value "237476";
   
     const MARKET_TYPES = ["MATCH_HANDICAP_(2-WAY)","MONEY_LINE","TOTAL_POINTS_(OVER/UNDER)"];
     const OVER_ID = "7017823";
@@ -40,13 +40,16 @@ class FanduelOdds {
             $marketPrices = $this->getMarketPrices($liveMarketIds);
             $processedMarketPrices = $this->processMarketPrices($marketPrices);
 
-            print_r($processedMarketPrices);
+
+            //Convert each prices into a string, using sprintf to format final html
+            $opposingTeam = $this->getOpposingTeam($marketPrices);
+            
             //create table out of processedMarketPrices
-            $html = sprintf('
+            $html = sprintf("
             <div>
                 <style>
                     table {
-                        width: 100%;
+                        width: 100%%;
                         border-collapse: collapse;
                     }
                     table, th, td {
@@ -55,9 +58,6 @@ class FanduelOdds {
                     th, td {
                         padding: 5px;
                         text-align: center;
-                    }
-                    th {
-                        background-color: #f2f2f2;
                     }
                 </style>
                 <table>
@@ -68,20 +68,22 @@ class FanduelOdds {
                         <th>Over/Under</th>
                     </tr>
                     <tr>
-                        <td>Raptors</td>
+                        <td>Toronto Raptors</td>
                         <td>%s (%s)</td>
-                        <td>+370</td>
-                        <td>O 235.5 (-112)</td>
+                        <td>%s</td>
+                        <td>O %s (%s)</td>
                     </tr>
                     <tr>
-                        <td>Clippers</td>
-                        <td>-10.5 (-108)</td>
-                        <td>-480</td>
-                        <td>U 235.5 (-108)</td>
+                        <td>%s</td>
+                        <td>%s (%s)</td>
+                        <td>%s</td>
+                        <td>U %s (%s)</td>
                     </tr>
                 </table>
             </div>
-            ', );
+            ", $processedMarketPrices[0]->spread[1], $processedMarketPrices[0]->spread[0], $processedMarketPrices[0]->moneyLine[0], 
+                $processedMarketPrices[2]->over[1], $processedMarketPrices[2]->over[0], $opposingTeam, $processedMarketPrices[1]->spread[1], 
+                $processedMarketPrices[1]->spread[0], $processedMarketPrices[1]->moneyLine[0], $processedMarketPrices[2]->under[1], $processedMarketPrices[2]->under[0]);
             return $html;
         }       
     }
@@ -221,20 +223,20 @@ class FanduelOdds {
                 // print_r($market->runnerDetails);
                 foreach($market->runnerDetails as $runnerDetail) {
                     if ($runnerDetail->selectionId == self::RAPTORS_ID) {
-                        $raptorsPrices->moneyLine = [$this->convertToAmericanOdds($runnerDetail), $runnerDetail->handicap];
+                        $raptorsPrices->moneyLine = [$this->convertToAmericanOdds($runnerDetail)[0]];
                     }
                     else {
-                        $opponentPrices->moneyLine = [$this->convertToAmericanOdds($runnerDetail), $runnerDetail->handicap];
+                        $opponentPrices->moneyLine = [$this->convertToAmericanOdds($runnerDetail)[0]];
                     }
                 }
             }
             elseif ($market->marketName == "Spread Betting") {
                 foreach($market->runnerDetails as $runnerDetail) {
                     if ($runnerDetail->selectionId == self::RAPTORS_ID) {
-                        $raptorsPrices->spread = [$this->convertToAmericanOdds($runnerDetail), $runnerDetail->handicap];
+                        $raptorsPrices->spread = $this->convertToAmericanOdds($runnerDetail);
                     }
                     else {
-                        $opponentPrices->spread = [$this->convertToAmericanOdds($runnerDetail), $runnerDetail->handicap];
+                        $opponentPrices->spread = $this->convertToAmericanOdds($runnerDetail);
                     }
                 }
             }
@@ -242,10 +244,10 @@ class FanduelOdds {
             elseif ($market->marketName == "Total Points") {
                 foreach($market->runnerDetails as $runnerDetail) {
                     if ($runnerDetail->selectionId == self::OVER_ID) {
-                        $overUnderPrices->over = [$this->convertToAmericanOdds($runnerDetail), $runnerDetail->handicap];
+                        $overUnderPrices->over = $this->convertToAmericanOdds($runnerDetail, true);
                     }
                     else {
-                        $overUnderPrices->under = [$this->convertToAmericanOdds($runnerDetail), $runnerDetail->handicap];
+                        $overUnderPrices->under = $this->convertToAmericanOdds($runnerDetail, true);
                     }
                 }
             }            
@@ -253,14 +255,42 @@ class FanduelOdds {
         return [$raptorsPrices, $opponentPrices, $overUnderPrices];
     }
 
-    private function convertToAmericanOdds($runnerDetail) {
+    private function getOpposingTeam($marketPrices) {
+
+        foreach ($marketPrices as $market) {         
+            foreach($market->runnerDetails as $runnerDetail) {
+                if ($runnerDetail->selectionId != self::RAPTORS_ID) {
+                    return $runnerDetail->selectionName; 
+                }
+            }
+        }
+    }
+
+    private function convertToAmericanOdds($runnerDetail, $isTotal=false) {
+
+        $handicap = "";
+
+        if (floatval($runnerDetail->handicap > 0)) {
+            // if market is total, do not add the + sign
+            if (!$isTotal) {
+                $handicap = "+" . $runnerDetail->handicap;
+            }
+            else {
+                $handicap = "" . $runnerDetail->handicap;
+            }          
+        }
+        else {
+            $handicap = "" . $runnerDetail->handicap;
+        }
+
         $decimalValue = floatval($runnerDetail->winRunnerOdds->decimal);
 
         if ($decimalValue > 2) {
-            return ($decimalValue - 1) * 100;
+            return ["+" . number_format(($decimalValue - 1) * 100), $handicap];
         }
         else {
-            return -100 / ($decimalValue - 1);
+            echo gettype(-100/($decimalValue - 1));
+            return ["" . number_format(-100 / ($decimalValue - 1)), $handicap];
         }
 
     }
