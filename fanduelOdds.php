@@ -188,7 +188,7 @@ class FanduelOdds {
 
         // if API call failed, executeAPICall returns an empty array
         if (is_array($data) && count($data) == 0) {
-            return [];
+            return [[], ""];
         }
 
         $groupedMarketsByGame = new stdClass();
@@ -211,7 +211,7 @@ class FanduelOdds {
             }
         }
         if (!isset($groupedMarketsByGame->$raptorsEventId)) {
-            return [];
+            return [[], ""];
         }
         else {
             return [$groupedMarketsByGame->$raptorsEventId, $raptorsEventId];
@@ -219,6 +219,11 @@ class FanduelOdds {
     }
 
     private function createDeepLink($marketPrices, $gameId, $opposingTeam, $opposingTeamType) {
+        /**
+         * Helper function that creates the deep link URL for the specific game 
+         *
+         * @return string URL for the specific game
+         */
         if ($opposingTeamType == "HOME") {      
             $formattedOpposingTeamName = explode(" ", $opposingTeam);
             $eventPageUrl = "https://sportsbook.fanduel.com/basketball/nba/toronto-raptors-@-" . strtolower($formattedOpposingTeamName[0]) . "-" . strtolower($formattedOpposingTeamName[1])  . "-" . $gameId;
