@@ -224,14 +224,20 @@ class FanduelOdds {
          *
          * @return string URL for the specific game
          */
-        if ($opposingTeamType == "HOME") {      
-            $formattedOpposingTeamName = explode(" ", $opposingTeam);
-            $eventPageUrl = "https://sportsbook.fanduel.com/basketball/nba/toronto-raptors-@-" . strtolower($formattedOpposingTeamName[0]) . "-" . strtolower($formattedOpposingTeamName[1])  . "-" . $gameId;
+        
+        // format opposing team name for URL
+        $opposingTeamNameWords = explode(" ", $opposingTeam);
+        $formattedOpposingTeamName = "";
+        foreach($opposingTeamNameWords as $word) {
+            $formattedOpposingTeamName .= strtolower($word) . "-";
+        }
+
+        if ($opposingTeamType == "HOME") {  
+            $eventPageUrl = "https://sportsbook.fanduel.com/basketball/nba/toronto-raptors-@-" . $formattedOpposingTeamName . $gameId;
             return $eventPageUrl;
         }
         else {
-            $formattedOpposingTeamName = explode(" ", $opposingTeam);
-            $eventPageUrl = "https://sportsbook.fanduel.com/basketball/nba/" . strtolower($formattedOpposingTeamName[0]) . "-" . strtolower($formattedOpposingTeamName[1]) ."-@-toronto-raptors"  . "-" . $gameId;
+            $eventPageUrl = "https://sportsbook.fanduel.com/basketball/nba/" . $formattedOpposingTeamName ."@-toronto-raptors"  . "-" . $gameId;
             return $eventPageUrl;
         }
     }
