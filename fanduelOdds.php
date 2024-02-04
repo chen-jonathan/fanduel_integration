@@ -191,20 +191,32 @@ class FanduelOdds {
 
         $groupedMarketsByGame = new stdClass();
         $raptorsEventId = "";
+        $raptorsStartTime = "";
         //group market prices by eventId (id of the game)
-        foreach($data->marketDetails as $market_detail) {
-            $eventId = $market_detail->eventId;
+        foreach($data->marketDetails as $marketDetail) {
+            $eventId = $marketDetail->eventId;
 
             // Initialize the array for this eventId if it hasn't been created yet
             if (!isset($groupedMarketsByGame->$eventId)) {
                 $groupedMarketsByGame->$eventId = [];
             }
-            array_push($groupedMarketsByGame->$eventId, $market_detail);
+            array_push($groupedMarketsByGame->$eventId, $marketDetail);
 
-            foreach($market_detail->runnerDetails as $runnerDetail) {
+            foreach($marketDetail->runnerDetails as $runnerDetail) {
                 if ($runnerDetail->selectionId == self::RAPTORS_ID) {
                     // grab the eventId of the Raptors game
-                    $raptorsEventId = $eventId;
+                    if ($raptorsEventId != "") {
+                        // grab the earliest game if multiple exist 
+                        $startTime = new DateTime($marketDetail->marketStartTime);
+                        if ($startTime < $raptorsStartTime) {
+                            $raptorsEventId = $eventId;
+                            $raptorsStartTime = $startTime;
+                        }
+                    }
+                    else {
+                        $raptorsEventId = $eventId;
+                        $raptorsStartTime = new DateTime($marketDetail->marketStartTime);
+                    }                  
                 }
             }
         }
