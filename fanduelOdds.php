@@ -34,14 +34,16 @@ class FanduelOdds {
             return '';
         }
         else {
-            $marketPrices = $this->getMarketPrices($liveMarketIds);
+            [$marketPrices, $gameId] = $this->getMarketPrices($liveMarketIds);
             if (count($marketPrices) == 0) {
                 return '';
-            }
+            }          
 
             $processedMarketPrices = $this->processMarketPrices($marketPrices);
 
-            $opposingTeam = $this->getOpposingTeam($marketPrices);
+            [$opposingTeam, $opposingTeamType] = $this->getOpposingTeam($marketPrices);
+
+            $deepLinkUrl = $this->createDeepLink($marketPrices, $gameId, $opposingTeam, $opposingTeamType);
 
             //create table out of processedMarketPrices
             $html = sprintf("
@@ -79,13 +81,13 @@ class FanduelOdds {
                         <td>U %s (%s)</td>
                     </tr>
                     <tr>
-                    	<td colspan=\"4\" style=\"text-align:center\"><a style=\"background:#c81243; color: white; padding:3px; font-weight:bold\" href=\"https://sportsbook.fanduel.com/teams/nba/toronto-raptors/odds\">View All Bets</a></td>
+                    	<td colspan=\"4\" style=\"text-align:center\"><a style=\"background:#c81243; color: white; padding:3px; font-weight:bold\" href=\"%s\">View All Bets</a></td>
                     </tr>
                 </table>
             </div>
             ", $processedMarketPrices[0]->spread[1], $processedMarketPrices[0]->spread[0], $processedMarketPrices[0]->moneyLine[0],
                 $processedMarketPrices[2]->over[1], $processedMarketPrices[2]->over[0], $opposingTeam, $processedMarketPrices[1]->spread[1],
-                $processedMarketPrices[1]->spread[0], $processedMarketPrices[1]->moneyLine[0], $processedMarketPrices[2]->under[1], $processedMarketPrices[2]->under[0]);
+                $processedMarketPrices[1]->spread[0], $processedMarketPrices[1]->moneyLine[0], $processedMarketPrices[2]->under[1], $processedMarketPrices[2]->under[0], $deepLinkUrl);
             return $html;
         }
     }
@@ -186,7 +188,7 @@ class FanduelOdds {
 
         // if API call failed, executeAPICall returns an empty array
         if (is_array($data) && count($data) == 0) {
-            return [];
+            return [[], ""];
         }
 
         $groupedMarketsByGame = new stdClass();
@@ -209,10 +211,34 @@ class FanduelOdds {
             }
         }
         if (!isset($groupedMarketsByGame->$raptorsEventId)) {
-            return [];
+            return [[], ""];
         }
         else {
-            return $groupedMarketsByGame->$raptorsEventId;
+            return [$groupedMarketsByGame->$raptorsEventId, $raptorsEventId];
+        }
+    }
+
+    private function createDeepLink($marketPrices, $gameId, $opposingTeam, $opposingTeamType) {
+        /**
+         * Helper function that creates the deep link URL for the specific game 
+         *
+         * @return string URL for the specific game
+         */
+        
+        // format opposing team name for URL
+        $opposingTeamNameWords = explode(" ", $opposingTeam);
+        $formattedOpposingTeamName = "";
+        foreach($opposingTeamNameWords as $word) {
+            $formattedOpposingTeamName .= strtolower($word) . "-";
+        }
+
+        if ($opposingTeamType == "HOME") {  
+            $eventPageUrl = "https://sportsbook.fanduel.com/basketball/nba/toronto-raptors-@-" . $formattedOpposingTeamName . $gameId;
+            return $eventPageUrl;
+        }
+        else {
+            $eventPageUrl = "https://sportsbook.fanduel.com/basketball/nba/" . $formattedOpposingTeamName ."@-toronto-raptors"  . "-" . $gameId;
+            return $eventPageUrl;
         }
     }
 
@@ -275,7 +301,7 @@ class FanduelOdds {
             if ($market->marketType != "TOTAL_POINTS_(OVER/UNDER)") {
                 foreach($market->runnerDetails as $runnerDetail) {
                     if ($runnerDetail->selectionId != self::RAPTORS_ID) {
-                        return $runnerDetail->selectionName;
+                        return [$runnerDetail->selectionName, $runnerDetail->runnerResult->runnerResultType];
                     }
                 }
             }
