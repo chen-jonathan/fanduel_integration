@@ -50,15 +50,27 @@ class FanduelOdds {
             <div>
                 <style>
                     table.bets {
-                        width: 100%%;
                         border-collapse: collapse;
+                        margin: auto;
                     }
-                    table.bets, table.bets th, table.bets td {
-                        border: 1px solid black;
+                    table.bets thead th {
+                        color: white;
                     }
-                    table.bets th, table.bets td {
-                        padding: 5px;
+                    table.bets td, table.bets th {
+                        padding: 3px;
+                        white-space: nowrap;
                         text-align: center;
+                        font-size: .9em;
+                    }
+                    table.bets {
+                         width: 250px;
+                    }
+                    table.bets thead {
+                        background: #97000E;
+                        color: white
+                    }
+                    table.bets tbody {
+                        background: #eeeeee;
                     }
                 </style>
                 <table class=\"bets\">
